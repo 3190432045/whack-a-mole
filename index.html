@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打地鼠游戏</title>
+    <style>
+        /* --- 页面基础样式 --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            background-color: #e8f5e9;
+            margin: 0;
+            padding: 30px;
+        }
+        h1 {
+            color: #2e7d32;
+        }
+        .stats {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        /* --- 游戏面板样式 --- */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 110px);
+            grid-gap: 20px;
+            justify-content: center;
+            margin: 0 auto;
+        }
+        
+        /* 洞口样式 */
+        .hole {
+            width: 110px;
+            height: 110px;
+            background-color: #5d4037; /* 泥土的颜色 */
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border: 4px solid #8d6e63;
+        }
+        
+        /* 地鼠样式 */
+        .mole {
+            width: 90px;
+            height: 90px;
+            position: absolute;
+            bottom: -100px; /* 初始状态隐藏在洞口下方 */
+            left: 10px;
+            transition: bottom 0.2s ease-in-out; /* 冒头和缩回的动画 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px; /* 使用 Emoji 作为地鼠 */
+            cursor: pointer;
+            user-select: none; /* 防止用户双击选中文本 */
+            -webkit-tap-highlight-color: transparent; /* 去除手机端点击高亮 */
+        }
+        
+        /* 地鼠冒头时的状态 */
+        .mole.up {
+            bottom: 5px; 
+        }
+
+        /* --- 按钮样式 --- */
+        button {
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background-color: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 30px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button:hover {
+            background-color: #f57c00;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🐹 欢乐打地鼠 🐹</h1>
+    
+    <div class="stats">
+        <span>得分: <strong id="score" style="color:#d32f2f">0</strong></span> &nbsp;&nbsp;|&nbsp;&nbsp;
+        <span>剩余时间: <strong id="time">30</strong> 秒</span>
+    </div>
+
+    <div class="board" id="board">
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+        <div class="hole"><div class="mole">🐹</div></div>
+    </div>
+
+    <button id="startBtn">开始游戏</button>
+
+    <script>
+        // 1. 获取 DOM 元素
+        const holes = document.querySelectorAll('.hole');
+        const moles = document.querySelectorAll('.mole');
+        const scoreDisplay = document.getElementById('score');
+        const timeDisplay = document.getElementById('time');
+        const startBtn = document.getElementById('startBtn');
+
+        // 2. 游戏核心变量
+        let lastHole;       // 记录上一个出地鼠的洞，防止连续同一个洞冒头
+        let timeUp = false; // 游戏是否结束的标志
+        let score = 0;      // 玩家得分
+        let gameDuration = 30; // 游戏总时长（秒）
+        let countdown;      // 倒计时定时器
+
+        // 3. 生成随机时间 (用于控制地鼠停留的时间)
+        function randomTime(min, max) {
+            return Math.round(Math.random() * (max - min) + min);
+        }
+
+        // 4. 随机选择一个洞口
+        function randomHole(holes) {
+            const idx = Math.floor(Math.random() * holes.length);
+            const hole = holes[idx];
+            
+            // 如果随机到的洞和上一次一样，重新随机
+            if (hole === lastHole) {
+                return randomHole(holes);
+            }
+            lastHole = hole;
+            return hole;
+        }
+
+        // 5. 地鼠冒头逻辑
+        function peep() {
+            // 随机决定这次地鼠停留 0.5秒 到 1秒
+            const time = randomTime(500, 1000); 
+            const hole = randomHole(holes);
+            const mole = hole.querySelector('.mole');
+
+            // 给地鼠添加 'up' 类，触发 CSS 动画让它冒出来
+            mole.classList.add('up');
+
+            // 设定停留时间后缩回去
+            setTimeout(() => {
+                mole.classList.remove('up');
+                // 如果游戏还没结束，继续让下一只地鼠冒头
+                if (!timeUp) {
+                    peep(); 
+                }
+            }, time);
+        }
+
+        // 6. 开始游戏逻辑
+        function startGame() {
+            // 重置分数、时间、状态和按钮
+            scoreDisplay.textContent = 0;
+            timeDisplay.textContent = gameDuration;
+            timeUp = false;
+            score = 0;
+            startBtn.disabled = true; // 游戏期间禁用开始按钮
+
+            // 触发第一只地鼠冒头
+            peep();
+
+            // 启动倒计时
+            let timeLeft = gameDuration;
+            countdown = setInterval(() => {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+                
+                // 时间耗尽，结束游戏
+                if (timeLeft <= 0) {
+                    clearInterval(countdown);
+                    timeUp = true;
+                    startBtn.disabled = false;
+                    setTimeout(() => alert(`⏰ 游戏结束！\n你的最终得分是：${score} 分！`), 300);
+                }
+            }, 1000);
+        }
+
+        // 7. 击打地鼠逻辑
+        function bonk(e) {
+            // 检查事件的 isTrusted 属性，防止用户用 JavaScript 脚本模拟点击作弊
+            if (!e.isTrusted) return; 
+            
+            // 如果地鼠当前没有冒头（没有 'up' 类），点击无效
+            if (!this.classList.contains('up')) return; 
+
+            score++;                     // 得分加一
+            this.classList.remove('up'); // 被打中后立刻缩回洞里
+            scoreDisplay.textContent = score; // 更新页面分数
+        }
+
+        // 8. 绑定事件监听器
+        moles.forEach(mole => {
+            // 电脑端鼠标点击
+            mole.addEventListener('mousedown', bonk);
+            // 移动端触摸点击 (兼容手机)
+            mole.addEventListener('touchstart', function(e) {
+                e.preventDefault(); 
+                bonk.call(this, e);
+            }, {passive: false});
+        });
+
+        startBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
